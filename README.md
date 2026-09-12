@@ -1,4 +1,4 @@
-# Actividad Ray Tracer Cube
+# Actividad Ray Tracer Cube Texturizado
 
 Raytracer escrito en Rust que renderiza un cubo con iluminación difusa, **textura** de ladrillo de LEGO y una cámara orbital controlable desde el teclado.
 
