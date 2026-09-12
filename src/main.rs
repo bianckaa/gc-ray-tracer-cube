@@ -4,6 +4,7 @@ mod framebuffer;
 mod light;
 mod ray_intersect;
 mod cube;
+mod texture;
 
 use minifb::{Key, Window, WindowOptions};
 use nalgebra_glm::{dot, normalize, Vec3};
@@ -16,10 +17,11 @@ use crate::framebuffer::Framebuffer;
 use crate::light::Light;
 use crate::ray_intersect::{Intersect, Material, RayIntersect};
 use crate::cube::Cube;
+use crate::texture::Texture;
 
 const WIDTH: usize = 800;
 const HEIGHT: usize = 600;
-const BACKGROUND_COLOR: u32 = 0xA1AB2C;
+const BACKGROUND_COLOR: u32 = 0xDCE9E5;
 
 const FOV: f32 = PI / 3.0;
 
@@ -28,6 +30,17 @@ const ROTATION_SPEED: f32 = PI / 60.0;
 const SHADOW_BIAS: f32 = 1e-3;
 const GROUND_Y: f32 = -1.75;
 const CAMERA_GROUND_MARGIN: f32 = 0.5;
+const AMBIENT_INTENSITY: f32 = 0.34;
+
+// Paleta LEGO
+const LEGO_YELLOW: u32 = 0xFFD500;
+const LEGO_BASEPLATE: u32 = 0x7EB3C1;
+
+// Retícula de botones (studs)
+const BRICK_STUD_PITCH: f32 = 1.0;
+const BRICK_STUD_RADIUS: f32 = 0.31;
+const PLATE_STUD_PITCH: f32 = 0.5;
+const PLATE_STUD_RADIUS: f32 = 0.155;
 
 pub fn cast_shadow(
     intersect: &Intersect,
@@ -50,6 +63,9 @@ pub fn shade(
     light: &Light,
     objects: &[Box<dyn RayIntersect>],
 ) -> Color {
+    // La textura entrega el color difuso y una normal con el relieve del botón.
+    let sample = intersect.material.sample(&intersect.point, &intersect.normal);
+
     let light_direction = (light.position - intersect.point).normalize();
 
     let light_intensity = if cast_shadow(intersect, &light_direction, light, objects) {
@@ -58,9 +74,13 @@ pub fn shade(
         light.intensity
     };
 
-    let diffuse_intensity = dot(&intersect.normal, &light_direction).max(0.0);
+    let diffuse_intensity = dot(&sample.normal, &light_direction).max(0.0);
 
-    intersect.material.diffuse * (diffuse_intensity * intersect.material.albedo * light_intensity)
+    let direct =
+        sample.color * (diffuse_intensity * intersect.material.albedo * light_intensity);
+    let ambient = sample.color * AMBIENT_INTENSITY;
+
+    direct + ambient
 }
 
 pub fn cast_ray(
@@ -124,27 +144,41 @@ fn main() {
 
     let mut window = Window::new("Ray Tracer Cube", WIDTH, HEIGHT, WindowOptions::default()).unwrap();
 
-    let ivory = Material::new(Color::new(240, 58, 71), 0.6);
-    let ground = Material::new(Color::new(0x0f, 0x4c, 0x5c), 0.3);
+    let brick = Material::textured(
+        Color::from_hex(LEGO_YELLOW),
+        1.0,
+        Texture::Lego {
+            pitch: BRICK_STUD_PITCH,
+            radius: BRICK_STUD_RADIUS,
+        },
+    );
+    let baseplate = Material::textured(
+        Color::from_hex(LEGO_BASEPLATE),
+        1.05,
+        Texture::Lego {
+            pitch: PLATE_STUD_PITCH,
+            radius: PLATE_STUD_RADIUS,
+        },
+    );
 
     let objects: Vec<Box<dyn RayIntersect>> = vec![
         Box::new(Cube {
             min: Vec3::new(-1.0, GROUND_Y, -1.0),
             max: Vec3::new(1.0, 0.25, 1.0),
-            material: ivory,
+            material: brick,
         }),
         Box::new(Cube {
             min: Vec3::new(-10.0, -2.0, -10.0),
             max: Vec3::new(10.0, GROUND_Y, 10.0),
-            material: ground,
+            material: baseplate,
         }),
     ];
 
-    let light = Light::new(Vec3::new(-6.0, 6.0, 8.0), Color::new(255, 255, 255), 5.0);
+    let light = Light::new(Vec3::new(-6.0, 7.0, 8.0), Color::new(255, 255, 255), 1.0);
 
     let mut camera = Camera::new(
-        Vec3::new(0.0, 0.4, 6.0),
-        Vec3::new(0.0, -0.7, 0.0),
+        Vec3::new(0.0, 3.0, 6.5),
+        Vec3::new(0.0, -0.6, 0.0),
         Vec3::new(0.0, 1.0, 0.0),
         GROUND_Y + CAMERA_GROUND_MARGIN,
     );

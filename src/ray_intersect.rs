@@ -1,15 +1,33 @@
 use crate::color::Color;
+use crate::texture::{Sample, Texture};
 use nalgebra_glm::Vec3;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Material {
     pub diffuse: Color,
     pub albedo: f32,
+    pub texture: Texture,
 }
 
 impl Material {
     pub fn new(diffuse: Color, albedo: f32) -> Self {
-        Material { diffuse, albedo }
+        Material {
+            diffuse,
+            albedo,
+            texture: Texture::Plain,
+        }
+    }
+
+    pub fn textured(diffuse: Color, albedo: f32, texture: Texture) -> Self {
+        Material {
+            diffuse,
+            albedo,
+            texture,
+        }
+    }
+
+    pub fn sample(&self, point: &Vec3, normal: &Vec3) -> Sample {
+        self.texture.sample(self.diffuse, point, normal)
     }
 }
 
